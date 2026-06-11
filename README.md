@@ -156,7 +156,7 @@ ai-professor-agent/
 ## 👨‍💻 Author
 
 **Developed by Dr. Aaditya Maheshwari**
-Head of Innovation & Incubation — **NJR i3 Labs Pvt. Ltd.** & **Techno India NJR Institute of Technology**, Udaipur, Rajasthan, India.
+Head of Innovation & Incubation — **NJR i3 Labs Pvt. Ltd.** & **Techno NJR Institute of Technology**, Udaipur, Rajasthan, India.
 
 *PhD in Health Informatics & Machine Learning · M.Tech (AI/ML), BITS Pilani*
 
