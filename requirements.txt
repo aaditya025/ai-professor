@@ -1,0 +1,15 @@
+# Dr. Maheshwari — AI Professor Agent
+# Python 3.11+ · Mac Mini M4 (16GB)
+
+# ── Core (required) ──
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+python-multipart==0.0.20   # required for image/form uploads
+
+# ── OCR: screenshot text extraction (recommended) ──
+# These read error/code screenshots WITHOUT a heavy vision model.
+# ALSO requires the tesseract binary:  brew install tesseract
+pytesseract==0.3.13
+pillow==11.1.0

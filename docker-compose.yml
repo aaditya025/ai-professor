@@ -1,0 +1,38 @@
+# ══════════════════════════════════════════════════════════════
+# Dr. Maheshwari — docker compose
+#   docker compose up --build
+# ══════════════════════════════════════════════════════════════
+services:
+  dr-maheshwari:
+    build:
+      context: .
+      args:
+        MODEL: gemma2:2b          # model baked into the image at build time
+    image: dr-maheshwari:latest
+    container_name: dr-maheshwari
+    ports:
+      - "8000:8000"
+    environment:
+      # Override any setting here instead of editing the image
+      MODEL_FAST: gemma2:2b
+      OCR_ENABLED: "true"
+      MAX_CONCURRENT: "3"
+      CONTEXT_WINDOW: "4096"
+      TEACHER_PASSWORD: "change-me-before-class"
+    volumes:
+      # Persist Ollama models so rebuilds/restarts don't re-download.
+      # (The model is already baked into the image; this just caches any
+      #  extra models you pull later, e.g. qwen2.5:3b or llava:7b.)
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    # On a Linux host WITH an NVIDIA GPU, uncomment to enable acceleration:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  ollama-models:
