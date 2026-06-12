@@ -27,7 +27,6 @@ import base64
 import hashlib
 import hmac
 import json
-import secrets
 import logging
 import time
 import os
@@ -312,16 +311,6 @@ class ChatRequest(BaseModel):
 class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
     roll_number: str = Field(default="", max_length=20)
-    client_id: Optional[str] = Field(default=None, max_length=64)
-
-    @field_validator("client_id")
-    @classmethod
-    def _safe_client_id(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        if not re.fullmatch(r"[A-Za-z0-9_\-]{1,64}", v):
-            return None  # ignore malformed tokens rather than failing registration
-        return v
 
     @field_validator("name")
     @classmethod
@@ -388,19 +377,16 @@ class StudentRegistry:
 
     def __init__(self):
         self._students: dict[str, StudentSession] = {}
-        self._ip_to_sid: dict[str, str] = {}        # kept for reference/display only
-        self._client_to_sid: dict[str, str] = {}    # per-browser identity (primary)
+        self._ip_to_sid: dict[str, str] = {}
         self._lock = asyncio.Lock()
 
-    async def register(self, name: str, roll_number: str, ip: str, client_id: Optional[str] = None) -> str:
+    async def register(self, name: str, roll_number: str, ip: str) -> str:
         async with self._lock:
-            # Identity is per BROWSER (client_id), NOT per IP. Many students can
-            # share one IP (NAT, Docker bridge, school proxy) — keying on IP would
-            # collapse them all into one shared session. The client_id comes from
-            # the browser's localStorage, so each device is a distinct student.
-            if client_id and client_id in self._client_to_sid:
-                sid = self._client_to_sid[client_id]
+            # Check if this IP already registered
+            if ip in self._ip_to_sid:
+                sid = self._ip_to_sid[ip]
                 if sid in self._students:
+                    # Update name if re-registering
                     self._students[sid].name = name
                     self._students[sid].roll_number = roll_number
                     self._students[sid].is_online = True
@@ -410,9 +396,7 @@ class StudentRegistry:
             if len(self._students) >= self.MAX_STUDENTS:
                 raise HTTPException(503, "Class is full. Please ask your instructor for help.")
 
-            # Unique id per registration (random component avoids collisions when
-            # several students register in the same second from the same IP).
-            sid = f"stu_{secrets.token_hex(5)}"
+            sid = f"stu_{hashlib.md5(f'{name}:{ip}:{time.time()}'.encode()).hexdigest()[:8]}"
             self._students[sid] = StudentSession(
                 student_id=sid,
                 name=name,
@@ -421,8 +405,7 @@ class StudentRegistry:
                 registered_at=time.time(),
                 last_active=time.time(),
             )
-            if client_id:
-                self._client_to_sid[client_id] = sid
+            self._ip_to_sid[ip] = sid
             log.info(f"📝 Student registered: {name} ({roll_number}) → {sid}")
             return sid
 
@@ -906,7 +889,7 @@ async def register_student(req: RegisterRequest, request: Request):
     allowed, _ = limiter.check(ip)
     if not allowed:
         raise HTTPException(429, "Too many attempts. Please wait a minute.")
-    sid = await students.register(req.name, req.roll_number, ip, req.client_id)
+    sid = await students.register(req.name, req.roll_number, ip)
     student = await students.get(sid)
     return {
         "student_id": sid,
@@ -1014,11 +997,7 @@ async def chat(req: ChatRequest, request: Request):
     if model == MODEL_DEEP:
         system += DEEP_PROMPT_ADDITION
 
-    # Note: the student's NAME is deliberately NOT placed in the prompt. Responses
-    # are cached globally (keyed by question), so embedding a name would leak one
-    # student's name into another's cached answer. The AI addresses students as
-    # "coder"; their actual name still appears in their own UI header.
-    prompt = f"{context}Student asks: {req.message}"
+    prompt = f"{context}{student.name} asks: {req.message}"
     collected: list[str] = []
 
     async def stream_inference():
@@ -1246,49 +1225,21 @@ async def clear_history(conversation_id: str = ""):
 # FRONTEND — Student UI
 # ═══════════════════════════════════════════════
 
-# ═══════════════════════════════════════════════
-# FRONTEND — Student UI
-# ═══════════════════════════════════════════════
-
-def _find_html(filename: str) -> Optional[Path]:
-    """Locate an HTML file whether it's in ./frontend/ or flattened next to main.py."""
-    base = Path(__file__).resolve().parent
-    candidates = [
-        base / "frontend" / filename,   # standard layout
-        base / filename,                # flattened next to main.py
-        Path.cwd() / "frontend" / filename,
-        Path.cwd() / filename,
-    ]
-    for p in candidates:
-        if p.is_file():
-            return p
-    return None
-
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
-    p = _find_html("index.html")
-    if p:
-        return HTMLResponse(content=p.read_text(encoding="utf-8"))
     base = Path(__file__).resolve().parent
-    return HTMLResponse(
-        f"<h1>Backend running ✅</h1>"
-        f"<p>Couldn't find <code>index.html</code>. Place it in "
-        f"<code>{base / 'frontend'}</code> or next to <code>main.py</code>.</p>",
-        status_code=404,
-    )
+    html_path = base / "frontend" / "index.html"
+    if html_path.is_file():
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    return HTMLResponse(f"<h1>Backend running ✅</h1><p>Place index.html in {html_path}</p>")
 
 @app.get("/teacher", response_class=HTMLResponse)
 async def serve_teacher():
-    p = _find_html("teacher.html")
-    if p:
-        return HTMLResponse(content=p.read_text(encoding="utf-8"))
     base = Path(__file__).resolve().parent
-    return HTMLResponse(
-        f"<h1>Teacher dashboard not found</h1>"
-        f"<p>Couldn't find <code>teacher.html</code>. Place it in "
-        f"<code>{base / 'frontend'}</code> or next to <code>main.py</code>.</p>",
-        status_code=404,
-    )
+    html_path = base / "frontend" / "teacher.html"
+    if html_path.is_file():
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Teacher dashboard not found</h1>")
 
 # ═══════════════════════════════════════════════
 # ENTRY POINT

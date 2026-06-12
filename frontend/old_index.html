@@ -216,14 +216,7 @@ input[type=file]{display:none}
 
 <script>
 const API=window.location.origin;
-// ═══ PER-BROWSER IDENTITY ═══
-// Each browser gets its OWN client_id (stored locally). This is what keeps every
-// student distinct even when many share one IP (NAT / Docker / school proxy).
-function uid(p){return p+(crypto.randomUUID?crypto.randomUUID().replace(/-/g,'').slice(0,16):Math.random().toString(36).slice(2,10)+Date.now().toString(36))}
-let clientId=localStorage.getItem('drm_client_id');
-if(!clientId){clientId=uid('cl_');localStorage.setItem('drm_client_id',clientId)}
-let convId=localStorage.getItem('drm_conv_id');
-if(!convId){convId=uid('c_');localStorage.setItem('drm_conv_id',convId)}
+let convId='c_'+Math.random().toString(36).slice(2,10);
 let streaming=false,studentId='',studentName='',selectedImage=null,visionEnabled=false;
 
 // ═══ REGISTRATION ═══
@@ -233,12 +226,10 @@ async function register(){
     const err=document.getElementById('regErr');
     if(!name||name.length<2){err.textContent='Please enter your full name.';return}
     try{
-        const r=await fetch(API+'/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,roll_number:roll,client_id:clientId})});
+        const r=await fetch(API+'/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,roll_number:roll})});
         if(!r.ok){const e=await r.json();throw new Error(e.detail||'Registration failed')}
         const d=await r.json();
         studentId=d.student_id;studentName=d.name;visionEnabled=d.vision_enabled;
-        // Remember name locally so a refresh pre-fills it (identity stays via client_id)
-        localStorage.setItem('drm_name',studentName);
         document.getElementById('regScreen').classList.add('hidden');
         document.getElementById('stuLabel').textContent='👤 '+studentName;
         document.getElementById('welcName').textContent='Welcome, '+studentName+'!';
@@ -246,8 +237,6 @@ async function register(){
         document.getElementById('inMsg').focus();
     }catch(e){err.textContent=e.message}
 }
-// Pre-fill the name field on return visits (does not auto-submit)
-(function(){const n=localStorage.getItem('drm_name');if(n){const el=document.getElementById('regName');if(el)el.value=n}})();
 document.getElementById('regName').addEventListener('keydown',e=>{if(e.key==='Enter')register()});
 document.getElementById('regRoll').addEventListener('keydown',e=>{if(e.key==='Enter')register()});
 
