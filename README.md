@@ -160,10 +160,9 @@ Head of Innovation & Incubation — **NJR i3 Labs Pvt. Ltd.** & **Techno NJR Ins
 
 *PhD in Health Informatics & Machine Learning · M.Tech (AI/ML), BITS Pilani*
 
-<!-- Add your own links 👇 -->
-- 🔗 LinkedIn: `https://linkedin.com/in/your-handle`
-- 🐙 GitHub: `https://github.com/your-handle`
-- 🏫 NJR i3 Labs: `https://your-lab-website`
+
+- 🔗 LinkedIn: `[https://linkedin.com/in/your-handle](https://www.linkedin.com/in/aadityamah/)`
+
 
 > Built at **NJR i3 Labs** to bring private, on-device AI tutoring into the classroom.
 
